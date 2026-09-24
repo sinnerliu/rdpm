@@ -39,8 +39,10 @@ pub struct RdpmConnectParams {
     pub audio_mode: u32,
     pub redirect_clipboard: u32,
     pub redirect_drives: u32,
+    pub redirect_printers: u32,
     pub admin_session: u32,
 }
+
 
 #[cfg(all(windows, target_env = "msvc"))]
 extern "C" {

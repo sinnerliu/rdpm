@@ -42,8 +42,10 @@ typedef struct {
     uint32_t audio_mode;         // 0: 本地, 1: 远端, 2: 禁用
     uint32_t redirect_clipboard; // 0: 关, 1: 开
     uint32_t redirect_drives;    // 0: 关, 1: 开
+    uint32_t redirect_printers;  // 0: 关, 1: 开
     uint32_t admin_session;      // 0: 关, 1: 开
 } RdpmConnectParams;
+
 
 // 创建 RDP 宿主实例并在父窗口下创建嵌入的子窗口
 RdpmNativeHost* rdpm_host_create(HWND parent_hwnd, RdpmEventCallback cb, void* user_data);

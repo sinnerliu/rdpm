@@ -10,7 +10,6 @@
 #include "mstscax.tlh"
 #pragma warning(pop)
 
-
 // ATL 模块支持
 class RdpmAtlModule final : public CAtlModuleT<RdpmAtlModule> {};
 static RdpmAtlModule g_rdpm_atl_module;
@@ -19,12 +18,12 @@ static RdpmAtlModule g_rdpm_atl_module;
 class RdpmEventSink : public IDispatch {
 public:
     RdpmEventSink(RdpmEventCallback cb, void* user_data)
-        : m_ref_count(1), m_cb(cb), m_user_data(user_data), m_cookie(0) {}
+        : m_ref_count(1), m_cb(cb), m_user_data(user_data) {}
 
     // IUnknown 接口
     STDMETHODIMP QueryInterface(REFIID riid, void** ppv) override {
         if (!ppv) return E_POINTER;
-        if (riid == IID_IUnknown || riid == IID_IDispatch || riid == DIID_DMsRdpClientEvents) {
+        if (riid == IID_IUnknown || riid == IID_IDispatch || riid == __uuidof(IMsTscAxEvents)) {
             *ppv = static_cast<IDispatch*>(this);
             AddRef();
             return S_OK;
@@ -62,6 +61,7 @@ public:
     ) override {
         if (!m_cb) return S_OK;
 
+        // 根据 IMsTscAxEvents DISPID 规范分发事件
         switch (dispIdMember) {
             case 1: // OnConnecting
                 m_cb(m_user_data, RDPM_EVENT_CONNECTING, 0, L"正在连接远程桌面...");
@@ -80,13 +80,13 @@ public:
                 m_cb(m_user_data, RDPM_EVENT_DISCONNECTED, reason, L"会话已断开");
                 break;
             }
-            case 12: // OnAutoReconnecting
+            case 17: // OnAutoReconnecting
                 m_cb(m_user_data, RDPM_EVENT_AUTO_RECONNECTING, 0, L"检测到网络闪断，正在自动重连...");
                 break;
-            case 13: // OnAutoReconnected
+            case 33: // OnAutoReconnected
                 m_cb(m_user_data, RDPM_EVENT_AUTO_RECONNECTED, 0, L"自动重连成功");
                 break;
-            case 7: { // OnFatalError(long errorCode)
+            case 10: { // OnFatalError(long errorCode)
                 long code = 0;
                 if (pDispParams && pDispParams->cArgs > 0 && pDispParams->rgvarg[0].vt == VT_I4) {
                     code = pDispParams->rgvarg[0].lVal;
@@ -100,8 +100,6 @@ public:
         return S_OK;
     }
 
-    DWORD m_cookie;
-
 private:
     volatile ULONG m_ref_count;
     RdpmEventCallback m_cb;
@@ -112,9 +110,9 @@ private:
 struct RdpmNativeHost {
     HWND m_parent_hwnd;
     HWND m_container_hwnd;
-    IMsRdpClient10* m_client;
+    IMsRdpClient9* m_client;
     IMsRdpClientNonScriptable5* m_non_scriptable;
-    RdpmEventSink* m_sink;
+    CComPtr<IConnectionPoint> m_connection_point;
     DWORD m_advise_cookie;
 
     RdpmNativeHost()
@@ -122,7 +120,6 @@ struct RdpmNativeHost {
           m_container_hwnd(nullptr),
           m_client(nullptr),
           m_non_scriptable(nullptr),
-          m_sink(nullptr),
           m_advise_cookie(0) {}
 };
 
@@ -150,7 +147,7 @@ RdpmNativeHost* rdpm_host_create(HWND parent_hwnd, RdpmEventCallback cb, void* u
     host->m_container_hwnd = CreateWindowExW(
         0,
         L"AtlAxWin",
-        L"MsRdpClient12", // 优先使用系统最先进的 MsRdpClient12
+        L"MsRdpClient9NotSafeForScripting", // 广泛受支持的标准 ProgID
         WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         0, 0, 0, 0,
         parent_hwnd,
@@ -160,7 +157,7 @@ RdpmNativeHost* rdpm_host_create(HWND parent_hwnd, RdpmEventCallback cb, void* u
     );
 
     if (!host->m_container_hwnd) {
-        // 若系统未注册 MsRdpClient12，尝试回退到通用 ProgID
+        // 若系统未注册，尝试回退到通用 ProgID
         host->m_container_hwnd = CreateWindowExW(
             0,
             L"AtlAxWin",
@@ -187,23 +184,25 @@ RdpmNativeHost* rdpm_host_create(HWND parent_hwnd, RdpmEventCallback cb, void* u
         return nullptr;
     }
 
-    // 查询高版本 IMsRdpClient10
-    if (FAILED(unk->QueryInterface(__uuidof(IMsRdpClient10), (void**)&host->m_client))) {
-        // 尝试降级查询基础 IMsRdpClient
-        if (FAILED(unk->QueryInterface(__uuidof(IMsRdpClient), (void**)&host->m_client))) {
-            DestroyWindow(host->m_container_hwnd);
-            delete host;
-            return nullptr;
-        }
+    // 查询 IMsRdpClient9 核心接口
+    if (FAILED(unk->QueryInterface(__uuidof(IMsRdpClient9), (void**)&host->m_client))) {
+        DestroyWindow(host->m_container_hwnd);
+        delete host;
+        return nullptr;
     }
 
     // 查询非脚本接口（用于安全写入密码）
     unk->QueryInterface(__uuidof(IMsRdpClientNonScriptable5), (void**)&host->m_non_scriptable);
 
-    // 挂接事件
+    // 挂接连接点事件
     if (cb) {
-        host->m_sink = new RdpmEventSink(cb, user_data);
-        AtlAdvise(host->m_client, host->m_sink, DIID_DMsRdpClientEvents, &host->m_advise_cookie);
+        CComPtr<IConnectionPointContainer> cpc;
+        if (SUCCEEDED(unk->QueryInterface(IID_IConnectionPointContainer, (void**)&cpc)) && cpc) {
+            if (SUCCEEDED(cpc->FindConnectionPoint(__uuidof(IMsTscAxEvents), &host->m_connection_point)) && host->m_connection_point) {
+                RdpmEventSink* sink = new RdpmEventSink(cb, user_data);
+                host->m_connection_point->Advise(static_cast<IDispatch*>(sink), &host->m_advise_cookie);
+            }
+        }
     }
 
     return host;
@@ -241,16 +240,16 @@ int32_t rdpm_host_connect(RdpmNativeHost* host, const RdpmConnectParams* params)
         SysFreeString(bstr_pass);
     }
 
-    // 5. 设置分辨率与显示模式
+    // 5. 设置分辨率
     if (params->desktop_width > 0 && params->desktop_height > 0) {
         host->m_client->put_DesktopWidth(static_cast<long>(params->desktop_width));
         host->m_client->put_DesktopHeight(static_cast<long>(params->desktop_height));
     }
 
-    // 6. 配置高级设置 (AdvancedSettings)
-    CComPtr<IMsRdpClientAdvancedSettings> adv;
-    if (SUCCEEDED(host->m_client->get_AdvancedSettings(&adv)) && adv) {
-        adv->put_RdpPort(static_cast<long>(params->port ? params->port : 3389));
+    // 6. 配置高级设置 (AdvancedSettings9)
+    CComPtr<IMsRdpClientAdvancedSettings8> adv;
+    if (SUCCEEDED(host->m_client->get_AdvancedSettings9(&adv)) && adv) {
+        adv->put_RDPPort(static_cast<LONG>(params->port ? params->port : 3389));
         adv->put_SmartSizing(params->smart_sizing ? VARIANT_TRUE : VARIANT_FALSE);
         adv->put_RedirectDrives(params->redirect_drives ? VARIANT_TRUE : VARIANT_FALSE);
         adv->put_RedirectPrinters(params->redirect_printers ? VARIANT_TRUE : VARIANT_FALSE);
@@ -271,10 +270,10 @@ int32_t rdpm_host_disconnect(RdpmNativeHost* host) {
 void rdpm_host_destroy(RdpmNativeHost* host) {
     if (!host) return;
 
-    if (host->m_sink && host->m_client && host->m_advise_cookie != 0) {
-        AtlUnadvise(host->m_client, DIID_DMsRdpClientEvents, host->m_advise_cookie);
-        host->m_sink->Release();
-        host->m_sink = nullptr;
+    if (host->m_connection_point && host->m_advise_cookie != 0) {
+        host->m_connection_point->Unadvise(host->m_advise_cookie);
+        host->m_connection_point.Release();
+        host->m_advise_cookie = 0;
     }
 
     if (host->m_non_scriptable) {
@@ -318,19 +317,16 @@ void rdpm_host_set_focus(RdpmNativeHost* host) {
 
 void rdpm_host_update_display(RdpmNativeHost* host, uint32_t width, uint32_t height) {
     if (!host || !host->m_client || width == 0 || height == 0) return;
-    CComPtr<IMsRdpClient8> client8;
-    if (SUCCEEDED(host->m_client->QueryInterface(__uuidof(IMsRdpClient8), (void**)&client8)) && client8) {
-        // 调用 RDP 8.1+ 动态重绘无感切换分辨率
-        client8->UpdateSessionDisplaySettings(
-            width,
-            height,
-            width,
-            height,
-            0,
-            100,
-            100
-        );
-    }
+    // 调用 IMsRdpClient9 动态更新会话分辨率与缩放比例
+    host->m_client->UpdateSessionDisplaySettings(
+        width,
+        height,
+        width,
+        height,
+        0,
+        100,
+        100
+    );
 }
 
 } // extern "C"

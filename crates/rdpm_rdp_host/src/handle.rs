@@ -82,6 +82,7 @@ pub struct HostConnectOptions {
     pub audio_mode: u32,
     pub redirect_clipboard: bool,
     pub redirect_drives: bool,
+    pub redirect_printers: bool,
     pub admin_session: bool,
 }
 
@@ -135,8 +136,10 @@ impl RdpHost {
             audio_mode: options.audio_mode,
             redirect_clipboard: if options.redirect_clipboard { 1 } else { 0 },
             redirect_drives: if options.redirect_drives { 1 } else { 0 },
+            redirect_printers: if options.redirect_printers { 1 } else { 0 },
             admin_session: if options.admin_session { 1 } else { 0 },
         };
+
 
         let res = unsafe { rdpm_host_connect(self.raw, &params) };
         if res != 0 {
