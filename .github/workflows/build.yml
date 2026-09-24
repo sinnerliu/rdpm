@@ -26,6 +26,12 @@ jobs:
       - name: 启用 Rust 编译缓存
         uses: Swatinem/rust-cache@v2
 
+      - name: 配置 MSVC 开发人员环境 (激活 ATL 与 C++ 工具链)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+
       - name: 编译 Release 版本
         run: cargo build --release --target x86_64-pc-windows-msvc
 

@@ -6,11 +6,10 @@
 #include <ocidl.h>
 
 #pragma warning(push)
-#pragma warning(disable : 4192)
 #pragma warning(disable : 4471)
-#import "libid:8C11EFA1-92C3-11D1-BC1E-00C04FA31489" \
-    raw_interfaces_only, named_guids, no_namespace, exclude("UINT_PTR")
+#include "mstscax.tlh"
 #pragma warning(pop)
+
 
 // ATL 模块支持
 class RdpmAtlModule final : public CAtlModuleT<RdpmAtlModule> {};
