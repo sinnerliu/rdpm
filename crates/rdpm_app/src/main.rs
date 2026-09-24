@@ -5,8 +5,7 @@ use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use rdpm_core::paths::AppPaths;
-use rdpm_core::storage::StorageManager;
-use rdpm_workspace::{StaggeredScheduler, WorkspaceManager};
+use rdpm_workspace::StaggeredScheduler;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,17 +25,15 @@ async fn main() -> Result<()> {
     info!("RDPM (Remote Desktop Profile Manager) 绿色便携版启动");
     info!("当前数据存放根目录: {:?}", AppPaths::data_dir());
 
-    // 3. 加载应用配置与服务器列表
-    let settings = StorageManager::load_settings()?;
-    let servers = StorageManager::load_servers()?;
-    info!("已加载服务器总数: {}", servers.total_server_count());
+    // 3. 初始化主控制器（接管服务器树、多Tab容器与工作区）
+    let controller = rdpm_ui::AppController::new(0)?;
+    info!("已加载服务器总数: {}", controller.tree.total_server_count());
 
     // 4. 工作区与自动恢复逻辑
-    let workspace_mgr = WorkspaceManager::load()?;
-    if settings.auto_restore_last_session {
-        if let Some(last_session) = workspace_mgr.get_last_session() {
+    if controller.settings.auto_restore_last_session {
+        if let Some(last_session) = controller.workspace_mgr.get_last_session() {
             info!("检测到上次运维环境，正在准备平滑复原: {}", last_session.name);
-            let scheduler = StaggeredScheduler::new(settings.staggered_restore_interval_ms);
+            let scheduler = StaggeredScheduler::new(controller.settings.staggered_restore_interval_ms);
             let tabs = last_session.tabs.clone();
             let active_idx = last_session.active_tab_index;
 
@@ -50,7 +47,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    // 5. 进入 Windows UI 消息循环
+    // 5. 核心控制器就绪
     info!("RDPM 核心准备就绪");
     Ok(())
 }
+
