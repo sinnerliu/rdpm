@@ -292,6 +292,7 @@ stateDiagram-v2
 - 重试间隔：$T(n) = \min(2^{n-1} \times 1000\text{ms}, 16000\text{ms})$，即 1s、2s、4s、8s、16s；
 - 每次重试附带唯一的 `generation_id`，防止上一轮因延迟到达的事件干扰最新一轮重连。
 
+
 ---
 
 ### 2.6 工作区（Workspace）与阶梯平滑恢复 (`rdpm_workspace`)
@@ -319,3 +320,32 @@ stateDiagram-v2
 当恢复包含 10 个服务器的工作区时，调度器执行两段式启动：
 1. **立即拉起活跃 Tab**：索引为 `active_tab_index` 的会话以高优先级立即创建 HWND 并握手；
 2. **延迟队列拉起其余 Tab**：其余 9 个会话压入 FIFO 队列，由 Tokio 异步任务每隔 250ms 取出一个发起连接，既防止瞬时 CPU/网络拥塞，又确保在数秒内全套环境自动就绪。
+
+---
+
+## 3. GitHub Actions 云端自动化构建与发布设计
+
+针对本地无 Rust/MSVC 编译环境的场景，工程设计了完备的 GitHub Actions CI/CD 工作流：
+
+```mermaid
+flowchart LR
+    LocalGit["本地修改代码"] --> GitPush["Git 提交并推送至 GitHub"]
+    GitPush --> GHActions["GitHub Actions (windows-latest)"]
+    subgraph BuildPipeline ["云端构建管线"]
+        SetupToolchain["配置 Rust MSVC + MSVC C++ (ATL)"]
+        CompileWorkspace["cargo build --release"]
+        AssemblePortable["组装绿色包 (rdpm.exe + data/ 骨架)"]
+    end
+    GHActions --> SetupToolchain
+    SetupToolchain --> CompileWorkspace
+    CompileWorkspace --> AssemblePortable
+    AssemblePortable --> Artifacts["输出绿色包 Artifact / GitHub Release"]
+```
+
+### 3.1 云端环境要求
+- **Runner 镜像**：`windows-latest`（默认自带 Visual Studio 2022、MSVC C++、ATL/MFC 组件、Windows SDK 10/11）。
+- **Rust 工具链**：`stable-x86_64-pc-windows-msvc`。
+- **打包格式**：
+  - `rdpm-portable-windows-x64.zip`：内含 `rdpm.exe` 和预创建的 `data/` 目录；
+  - 发布 Release 时自动关联此 Zip 包，用户下载解压双击即可使用。
+

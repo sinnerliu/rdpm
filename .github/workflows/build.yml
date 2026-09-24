@@ -1,0 +1,59 @@
+name: 构建与发布绿色便携版
+
+on:
+  push:
+    branches: [ master, main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 构建 Windows x64 绿色便携版
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: 启用 Rust 编译缓存
+        uses: Swatinem/rust-cache@v2
+
+      - name: 编译 Release 版本
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: 组装绿色便携包
+        shell: pwsh
+        run: |
+          $distDir = "dist/rdpm"
+          New-Item -ItemType Directory -Force -Path "$distDir/data"
+          Copy-Item "target/x86_64-pc-windows-msvc/release/rdpm.exe" -Destination "$distDir/"
+          Copy-Item "README.md" -Destination "$distDir/" -ErrorAction SilentlyContinue
+          
+          # 压缩为 Zip 绿色包
+          Compress-Archive -Path "$distDir/*" -DestinationPath "dist/rdpm-portable-windows-x64.zip" -Force
+
+      - name: 上传构建产物 (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdpm-portable-windows-x64
+          path: dist/rdpm-portable-windows-x64.zip
+          retention-days: 14
+
+      - name: 发布 GitHub Release (仅在推送 Tag 时)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/rdpm-portable-windows-x64.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
