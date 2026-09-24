@@ -1,7 +1,8 @@
 use anyhow::Result;
-use windows::Win32::Foundation::HWND;
+use rdpm_rdp_host::ffi::HWND;
 
 use rdpm_core::model::ServerEntry;
+
 use rdpm_session::RdpSession;
 use crate::geometry::PhysicalBounds;
 

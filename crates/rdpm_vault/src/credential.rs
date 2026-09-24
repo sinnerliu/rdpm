@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
+
 
 use crate::dpapi::{decrypt_bytes, encrypt_bytes};
 use rdpm_core::paths::AppPaths;
@@ -42,11 +42,11 @@ impl CredentialItem {
 }
 
 /// 凭据内部明文序列化结构（仅存在于加密前和解密后的内存瞬态）
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Zeroize)]
-#[zeroize(drop)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct PlaintextVault {
     credentials: HashMap<String, CredentialItem>,
 }
+
 
 /// 凭据保管箱管理器
 pub struct CredentialVault {

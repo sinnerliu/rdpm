@@ -51,8 +51,8 @@ impl StaggeredScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+
 
     #[tokio::test]
     async fn test_staggered_execution() {

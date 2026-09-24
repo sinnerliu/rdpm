@@ -1,12 +1,11 @@
 use std::ffi::c_void;
 use std::os::raw::c_int;
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use windows::Win32::Foundation::HWND;
 
 use crate::ffi::*;
+
 
 /// RDP 强类型事件
 #[derive(Debug, Clone, PartialEq, Eq)]

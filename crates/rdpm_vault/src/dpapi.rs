@@ -1,4 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+#[cfg(windows)]
+use anyhow::anyhow;
+
 
 #[cfg(windows)]
 pub fn encrypt_bytes(data: &[u8]) -> Result<Vec<u8>> {

@@ -1,6 +1,12 @@
 use std::ffi::c_void;
 use std::os::raw::c_int;
-use windows::Win32::Foundation::HWND;
+
+#[cfg(windows)]
+pub use windows::Win32::Foundation::HWND;
+
+#[cfg(not(windows))]
+pub type HWND = isize;
+
 
 #[repr(C)]
 pub struct RdpmNativeHost {

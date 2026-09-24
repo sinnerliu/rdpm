@@ -1,12 +1,11 @@
-use std::sync::Arc;
-use tokio::sync::{mpsc, watch};
-use windows::Win32::Foundation::HWND;
+use tokio::sync::watch;
 use anyhow::Result;
 
 use rdpm_core::model::ServerEntry;
+use rdpm_rdp_host::ffi::HWND;
 use rdpm_rdp_host::{HostConnectOptions, RdpHost, RdpHostEvent};
-use crate::reconnect::ReconnectPolicy;
 use crate::state::SessionStatus;
+
 
 /// 单个 RDP 运维会话实例
 pub struct RdpSession {
@@ -38,8 +37,10 @@ impl RdpSession {
             audio_mode: server.options.audio_mode as u32,
             redirect_clipboard: server.options.redirect_clipboard,
             redirect_drives: server.options.redirect_drives,
+            redirect_printers: server.options.redirect_printers,
             admin_session: server.options.admin_session,
         };
+
 
         // 发起初次连接
         let _ = status_tx.send(SessionStatus::Connecting);
