@@ -1,0 +1,18 @@
+[package]
+name = "rdpm_ui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rdpm_core.workspace = true
+rdpm_vault.workspace = true
+rdpm_session.workspace = true
+rdpm_workspace.workspace = true
+rdpm_rdp_host.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+windows.workspace = true
+raw-window-handle = "0.6"

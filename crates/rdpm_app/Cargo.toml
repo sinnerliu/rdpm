@@ -1,0 +1,25 @@
+[package]
+name = "rdpm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "rdpm"
+path = "src/main.rs"
+
+[dependencies]
+rdpm_core.workspace = true
+rdpm_vault.workspace = true
+rdpm_rdp_host.workspace = true
+rdpm_session.workspace = true
+rdpm_workspace.workspace = true
+rdpm_ui.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+windows.workspace = true
+

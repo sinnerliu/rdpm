@@ -1,0 +1,14 @@
+[package]
+name = "rdpm_workspace"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rdpm_core.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
